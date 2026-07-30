@@ -135,7 +135,7 @@ class SettingsTab(QWidget):
         self.form.setRowVisible(self.url, not is_command)
 
     def new_form(self, *, confirm: bool = True) -> bool:
-        if confirm and not self._confirm_discard_changes("新規入力へ切り替えますか？"):
+        if confirm and not self.confirm_discard_changes("新規入力へ切り替えますか？"):
             return False
         self.current_id = None
         self._original = None
@@ -160,7 +160,7 @@ class SettingsTab(QWidget):
         self._update_type_fields()
 
     def reset_values(self) -> None:
-        if not self._confirm_discard_changes("入力内容を元に戻しますか？"):
+        if not self.confirm_discard_changes("入力内容を元に戻しますか？"):
             return
         if self._original:
             self.load_tool(self._original)
@@ -185,8 +185,11 @@ class SettingsTab(QWidget):
             tool.show_console,
         )
 
-    def _confirm_discard_changes(self, message: str) -> bool:
-        if self._baseline == self._snapshot():
+    def has_unsaved_changes(self) -> bool:
+        return self._baseline != self._snapshot()
+
+    def confirm_discard_changes(self, message: str) -> bool:
+        if not self.has_unsaved_changes():
             return True
         return (
             QMessageBox.question(

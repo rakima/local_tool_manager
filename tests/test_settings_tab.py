@@ -46,3 +46,13 @@ def test_clear_resets_unsaved_input_after_confirmation():
 
     assert tab.name.text() == ""
     question.assert_called_once()
+
+
+def test_reports_unsaved_changes():
+    tab = create_tab()
+
+    assert not tab.has_unsaved_changes()
+
+    tab.name.setText("未保存ツール")
+
+    assert tab.has_unsaved_changes()
