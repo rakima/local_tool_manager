@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "local-tool-manager"
+version = "0.1.0"
+description = "Windows向けローカルツール実行管理アプリ"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "PySide6>=6.7,<7",
+    "psutil>=5.9,<8",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9"]
+
+[project.scripts]
+local-tool-manager = "local_tool_manager.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/local_tool_manager"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
