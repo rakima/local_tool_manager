@@ -73,6 +73,7 @@ class ExecutionTab(QWidget):
         )
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setStyleSheet("QTableWidget { outline: none; }")
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.verticalHeader().setVisible(False)
         header = self.table.horizontalHeader()

@@ -32,6 +32,7 @@ class SettingsTab(QWidget):
         self.process_service = process_service
         self.current_id: int | None = None
         self._original: Tool | None = None
+        self._baseline: tuple | None = None
 
         self.name = QLineEdit()
         self.description = QTextEdit()
@@ -52,18 +53,25 @@ class SettingsTab(QWidget):
             self.working_directory, "参照...", self._select_directory
         )
         command_row = self._browse_row(self.command, "参照...", self._select_command)
-        form = QFormLayout()
-        form.addRow("名前 *", self.name)
-        form.addRow("説明", self.description)
-        form.addRow("カテゴリ", self.category)
-        form.addRow("種類 *", self.entry_type)
-        form.addRow("", self.favorite)
-        form.addRow("実行ディレクトリ", directory_row)
-        form.addRow("実行コマンド *", command_row)
-        form.addRow("引数", self.arguments)
-        form.addRow("URL *", self.url)
-        form.addRow("", self.allow_multiple)
-        form.addRow("", self.show_console)
+        self.form = QFormLayout()
+        self.form.addRow("名前 *", self.name)
+        self.form.addRow("説明", self.description)
+        self.form.addRow("カテゴリ", self.category)
+        self.form.addRow("種類 *", self.entry_type)
+        self.form.addRow("", self.favorite)
+        self.form.addRow("実行ディレクトリ", directory_row)
+        self.form.addRow("実行コマンド *", command_row)
+        self.form.addRow("引数", self.arguments)
+        self.form.addRow("URL *", self.url)
+        self.form.addRow("", self.allow_multiple)
+        self.form.addRow("", self.show_console)
+        self._command_rows = (
+            directory_row,
+            command_row,
+            self.arguments,
+            self.allow_multiple,
+            self.show_console,
+        )
 
         self.new_button = QPushButton("新規")
         self.save_button = QPushButton("保存")
@@ -80,7 +88,7 @@ class SettingsTab(QWidget):
         buttons.addStretch()
 
         layout = QVBoxLayout(self)
-        layout.addLayout(form)
+        layout.addLayout(self.form)
         layout.addLayout(buttons)
         layout.addStretch()
 
@@ -89,7 +97,7 @@ class SettingsTab(QWidget):
         self.save_button.clicked.connect(self.save)
         self.delete_button.clicked.connect(self.delete)
         self.clear_button.clicked.connect(self.reset_values)
-        self.new_form()
+        self.new_form(confirm=False)
 
     @staticmethod
     def _browse_row(field: QLineEdit, text: str, callback) -> QWidget:
@@ -121,23 +129,21 @@ class SettingsTab(QWidget):
             self.command.setText(path)
 
     def _update_type_fields(self) -> None:
-        command_enabled = self.entry_type.currentData() == "command"
-        for widget in (
-            self.working_directory,
-            self.command,
-            self.arguments,
-            self.allow_multiple,
-            self.show_console,
-        ):
-            widget.setEnabled(command_enabled)
-        self.url.setEnabled(not command_enabled)
+        is_command = self.entry_type.currentData() == "command"
+        for row in self._command_rows:
+            self.form.setRowVisible(row, is_command)
+        self.form.setRowVisible(self.url, not is_command)
 
-    def new_form(self) -> None:
+    def new_form(self, *, confirm: bool = True) -> bool:
+        if confirm and not self._confirm_discard_changes("新規入力へ切り替えますか？"):
+            return False
         self.current_id = None
         self._original = None
         self._clear_fields()
+        self._baseline = self._snapshot()
         self.delete_button.setEnabled(False)
         self.name.setFocus()
+        return True
 
     def _clear_fields(self) -> None:
         self.name.clear()
@@ -154,10 +160,42 @@ class SettingsTab(QWidget):
         self._update_type_fields()
 
     def reset_values(self) -> None:
+        if not self._confirm_discard_changes("入力内容を元に戻しますか？"):
+            return
         if self._original:
             self.load_tool(self._original)
         else:
             self._clear_fields()
+            self._baseline = self._snapshot()
+
+    def _snapshot(self) -> tuple:
+        tool = self._form_tool()
+        return (
+            tool.id,
+            tool.name,
+            tool.description,
+            tool.category,
+            tool.entry_type,
+            tool.is_favorite,
+            tool.working_directory,
+            tool.command,
+            tool.arguments,
+            tool.url,
+            tool.allow_multiple_instances,
+            tool.show_console,
+        )
+
+    def _confirm_discard_changes(self, message: str) -> bool:
+        if self._baseline == self._snapshot():
+            return True
+        return (
+            QMessageBox.question(
+                self,
+                "未保存の変更",
+                f"未保存の変更があります。\n{message}",
+            )
+            == QMessageBox.StandardButton.Yes
+        )
 
     def load_tool(self, tool: Tool, duplicate: bool = False) -> None:
         self._original = None if duplicate else tool
@@ -175,6 +213,7 @@ class SettingsTab(QWidget):
         self.show_console.setChecked(tool.show_console)
         self.delete_button.setEnabled(not duplicate and tool.id is not None)
         self._update_type_fields()
+        self._baseline = self._snapshot()
 
     def _form_tool(self) -> Tool:
         return Tool(
@@ -220,5 +259,5 @@ class SettingsTab(QWidget):
         except Exception as error:
             QMessageBox.critical(self, "削除エラー", f"削除できませんでした。\n{error}")
             return
-        self.new_form()
+        self.new_form(confirm=False)
         self.deleted.emit()
