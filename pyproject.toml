@@ -15,6 +15,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<9"]
+build = ["pyinstaller>=6.15,<7"]
 
 [project.scripts]
 local-tool-manager = "local_tool_manager.main:main"

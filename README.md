@@ -24,6 +24,31 @@ local-tool-manager
 python -m local_tool_manager.main
 ```
 
+## Windows実行ファイルのビルド
+
+Pythonをインストールしていない環境でも起動できる単一のGUI実行ファイルを、
+PyInstallerで生成できます。
+
+```powershell
+python -m pip install -e ".[build]"
+.\scripts\build_windows.ps1
+```
+
+生成先は次のとおりです。
+
+```text
+dist\LocalToolManager.exe
+```
+
+ビルド後、デスクトップへショートカットを作成できます。
+
+```powershell
+.\scripts\create_shortcut.ps1
+```
+
+ショートカットはリポジトリ内の `dist\LocalToolManager.exe` を参照します。
+リポジトリを移動した場合は、上記スクリプトを再実行してください。
+
 ## 登録例
 
 ### Pythonツール
