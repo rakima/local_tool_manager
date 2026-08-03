@@ -20,7 +20,7 @@ class AlreadyRunningError(RuntimeError):
 
 
 def build_command(tool: Tool) -> list[str]:
-    command = os.path.expandvars(tool.command.strip().strip('"'))
+    command = resolve_command(tool)
     arguments = shlex.split(tool.arguments, posix=False) if tool.arguments.strip() else []
     arguments = [part.strip('"') for part in arguments]
     if Path(command).suffix.lower() == ".py":
@@ -28,9 +28,26 @@ def build_command(tool: Tool) -> list[str]:
     return [command, *arguments]
 
 
+def resolve_command(tool: Tool) -> str:
+    command = os.path.expandvars(tool.command.strip().strip('"'))
+    command_path = Path(command)
+    working_directory = os.path.expandvars(tool.working_directory.strip())
+    relative_path = Path(working_directory) / command_path
+    if (
+        not command_path.is_absolute()
+        and working_directory
+        and (
+            relative_path.is_file()
+            or any(separator in command for separator in "\\/")
+        )
+    ):
+        return str(relative_path.resolve())
+    return command
+
+
 def resolve_working_directory(tool: Tool) -> str | None:
     if tool.working_directory.strip():
-        return tool.working_directory.strip()
+        return os.path.expandvars(tool.working_directory.strip())
     command = Path(os.path.expandvars(tool.command.strip().strip('"')))
     return str(command.parent) if command.is_absolute() else None
 

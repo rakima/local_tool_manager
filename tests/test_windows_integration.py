@@ -67,7 +67,7 @@ def test_runs_python_script_with_spaced_argument_and_working_directory(
     )
     tool = save_tool(
         repository,
-        command=str(script),
+        command=script.name,
         arguments='"argument with spaces"',
         working_directory=str(working_directory),
     )

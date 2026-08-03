@@ -29,6 +29,23 @@ def test_python_script_uses_current_interpreter():
     assert command[1:] == [r"C:\tools\main.py", "--x", "1"]
 
 
+def test_relative_python_script_is_resolved_from_working_directory(tmp_path):
+    script = tmp_path / "scripts" / "main.py"
+    script.parent.mkdir()
+    script.touch()
+    tool = Tool(
+        name="python",
+        entry_type="command",
+        working_directory=str(tmp_path),
+        command=r"scripts\main.py",
+    )
+
+    command = build_command(tool)
+
+    assert Path(command[0]).name.lower().startswith("python")
+    assert Path(command[1]) == script
+
+
 def test_nonexistent_pid_is_not_running_and_history_is_closed(repository):
     tool = repository.create(
         Tool(name="test", entry_type="command", command="python")
