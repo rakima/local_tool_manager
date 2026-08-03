@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import webbrowser
+from datetime import datetime
 
 from PySide6.QtCore import QTimer, Qt, Signal
 from PySide6.QtWidgets import (
@@ -39,6 +40,16 @@ STATUS_LABELS = {
     "completed": "停止中",
     "stopped": "停止中",
 }
+
+
+def format_last_run_at(value: str | None) -> str:
+    if not value:
+        return ""
+    try:
+        local_datetime = datetime.fromisoformat(value).astimezone()
+        return local_datetime.strftime("%Y/%m/%d %H:%M:%S")
+    except ValueError:
+        return value
 
 
 class ExecutionTab(QWidget):
@@ -124,7 +135,7 @@ class ExecutionTab(QWidget):
                 "コマンド" if tool.entry_type == "command" else "URL",
                 tool.category,
                 STATUS_LABELS.get(tool.status, "停止中"),
-                tool.last_run_at or "",
+                format_last_run_at(tool.last_run_at),
                 tool.description,
             ]
             for column, value in enumerate(values):
