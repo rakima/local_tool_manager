@@ -32,6 +32,9 @@ class ToolService:
         self.repository.delete(tool_id)
         logging.getLogger(__name__).info("ツール削除 id=%s", tool_id)
 
+    def list_tools(self) -> list[Tool]:
+        return self.repository.list()
+
     @staticmethod
     def validate(tool: Tool) -> None:
         errors: list[str] = []

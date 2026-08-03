@@ -1,7 +1,9 @@
 from unittest.mock import Mock, patch
 
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication, QInputDialog, QMessageBox
 
+from local_tool_manager.models import Tool
+from local_tool_manager.services.tool_service import ToolService
 from local_tool_manager.ui.settings_tab import SettingsTab
 
 
@@ -56,3 +58,47 @@ def test_reports_unsaved_changes():
     tab.name.setText("未保存ツール")
 
     assert tab.has_unsaved_changes()
+
+
+def test_copies_registered_tool_as_unsaved_new_tool(repository):
+    source = repository.create(
+        Tool(
+            name="コピー元",
+            description="説明",
+            category="開発",
+            entry_type="command",
+            working_directory=r"C:\tools",
+            command=r"scripts\main.py",
+            arguments="--mode fast",
+            allow_multiple_instances=True,
+        )
+    )
+    tab = SettingsTab(ToolService(repository), Mock())
+
+    with patch.object(
+        QInputDialog,
+        "getItem",
+        return_value=(f"{source.name} (ID: {source.id})", True),
+    ):
+        tab.copy_button.click()
+
+    assert tab.current_id is None
+    assert tab.name.text() == "コピー元のコピー"
+    assert tab.command.text() == r"scripts\main.py"
+    assert tab.arguments.text() == "--mode fast"
+    assert tab.allow_multiple.isChecked()
+    assert not tab.delete_button.isEnabled()
+    assert tab.has_unsaved_changes()
+
+
+def test_copy_keeps_current_input_when_discard_is_declined(repository):
+    repository.create(Tool(name="コピー元", entry_type="command", command="cmd"))
+    tab = SettingsTab(ToolService(repository), Mock())
+    tab.name.setText("編集中")
+
+    with patch.object(
+        QMessageBox, "question", return_value=QMessageBox.StandardButton.No
+    ):
+        tab.copy_button.click()
+
+    assert tab.name.text() == "編集中"
