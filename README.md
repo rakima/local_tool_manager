@@ -40,6 +40,15 @@ python -m pip install -e ".[build]"
 dist\LocalToolManager.exe
 ```
 
+ビルド後、デスクトップへショートカットを作成できます。
+
+```powershell
+.\scripts\create_shortcut.ps1
+```
+
+ショートカットはリポジトリ内の `dist\LocalToolManager.exe` を参照します。
+リポジトリを移動した場合は、上記スクリプトを再実行してください。
+
 ## 登録例
 
 ### Pythonツール
