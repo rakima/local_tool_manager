@@ -32,6 +32,9 @@ class ToolService:
         self.repository.delete(tool_id)
         logging.getLogger(__name__).info("ツール削除 id=%s", tool_id)
 
+    def list_tools(self) -> list[Tool]:
+        return self.repository.list()
+
     @staticmethod
     def validate(tool: Tool) -> None:
         errors: list[str] = []
@@ -45,10 +48,19 @@ class ToolService:
             if tool.working_directory and not Path(tool.working_directory).is_dir():
                 errors.append("実行ディレクトリが存在しません。")
             command = os.path.expandvars(tool.command.strip().strip('"'))
+            command_path = Path(command)
+            if (
+                not command_path.is_absolute()
+                and tool.working_directory.strip()
+                and any(sep in command for sep in "\\/")
+            ):
+                command_path = Path(
+                    os.path.expandvars(tool.working_directory.strip())
+                ) / command_path
             if (
                 command
-                and (Path(command).is_absolute() or any(sep in command for sep in "\\/"))
-                and not Path(command).is_file()
+                and (command_path.is_absolute() or any(sep in command for sep in "\\/"))
+                and not command_path.is_file()
             ):
                 errors.append("実行コマンドのファイルが存在しません。")
         elif tool.entry_type == "url":

@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
+    QInputDialog,
     QLineEdit,
     QMessageBox,
     QPushButton,
@@ -74,12 +75,14 @@ class SettingsTab(QWidget):
         )
 
         self.new_button = QPushButton("新規")
+        self.copy_button = QPushButton("既存からコピー")
         self.save_button = QPushButton("保存")
         self.delete_button = QPushButton("削除")
         self.clear_button = QPushButton("入力クリア")
         buttons = QHBoxLayout()
         for button in (
             self.new_button,
+            self.copy_button,
             self.save_button,
             self.delete_button,
             self.clear_button,
@@ -94,6 +97,7 @@ class SettingsTab(QWidget):
 
         self.entry_type.currentIndexChanged.connect(self._update_type_fields)
         self.new_button.clicked.connect(self.new_form)
+        self.copy_button.clicked.connect(self.copy_from_existing)
         self.save_button.clicked.connect(self.save)
         self.delete_button.clicked.connect(self.delete)
         self.clear_button.clicked.connect(self.reset_values)
@@ -168,6 +172,31 @@ class SettingsTab(QWidget):
             self._clear_fields()
             self._baseline = self._snapshot()
 
+    def copy_from_existing(self) -> None:
+        if not self.confirm_discard_changes(
+            "既存ツールの設定をコピーしますか？"
+        ):
+            return
+        tools = self.service.list_tools()
+        if not tools:
+            QMessageBox.information(
+                self, "既存からコピー", "コピーできる登録済みツールがありません。"
+            )
+            return
+        labels = [f"{tool.name} (ID: {tool.id})" for tool in tools]
+        selected, accepted = QInputDialog.getItem(
+            self,
+            "既存からコピー",
+            "コピー元ツール",
+            labels,
+            0,
+            False,
+        )
+        if not accepted:
+            return
+        self.load_tool(tools[labels.index(selected)], duplicate=True)
+        self.name.setFocus()
+
     def _snapshot(self) -> tuple:
         tool = self._form_tool()
         return (
@@ -216,7 +245,7 @@ class SettingsTab(QWidget):
         self.show_console.setChecked(tool.show_console)
         self.delete_button.setEnabled(not duplicate and tool.id is not None)
         self._update_type_fields()
-        self._baseline = self._snapshot()
+        self._baseline = None if duplicate else self._snapshot()
 
     def _form_tool(self) -> Tool:
         return Tool(
