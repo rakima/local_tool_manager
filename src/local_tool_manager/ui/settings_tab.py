@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+import subprocess
+
 from PySide6.QtCore import Signal
+from PySide6.QtGui import QColor, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFileDialog,
     QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QInputDialog,
     QLineEdit,
     QMessageBox,
+    QPlainTextEdit,
     QPushButton,
     QTextEdit,
     QVBoxLayout,
@@ -17,7 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from local_tool_manager.models import Tool
-from local_tool_manager.services import ProcessService
+from local_tool_manager.services import CheckProcessRunner, ProcessService
 from local_tool_manager.services.tool_service import ToolService, ValidationError
 
 
@@ -34,6 +39,7 @@ class SettingsTab(QWidget):
         self.current_id: int | None = None
         self._original: Tool | None = None
         self._baseline: tuple | None = None
+        self.check_runner = CheckProcessRunner(self)
 
         self.name = QLineEdit()
         self.description = QTextEdit()
@@ -79,6 +85,9 @@ class SettingsTab(QWidget):
         self.save_button = QPushButton("保存")
         self.delete_button = QPushButton("削除")
         self.clear_button = QPushButton("入力クリア")
+        self.check_button = QPushButton("実行チェック")
+        self.stop_check_button = QPushButton("チェック停止")
+        self.stop_check_button.setEnabled(False)
         buttons = QHBoxLayout()
         for button in (
             self.new_button,
@@ -86,14 +95,33 @@ class SettingsTab(QWidget):
             self.save_button,
             self.delete_button,
             self.clear_button,
+            self.check_button,
+            self.stop_check_button,
         ):
             buttons.addWidget(button)
         buttons.addStretch()
 
+        self.terminal = QPlainTextEdit()
+        self.terminal.setReadOnly(True)
+        self.terminal.setPlaceholderText(
+            "実行チェックの標準出力とエラー出力を表示します。"
+        )
+        self.terminal.setMaximumBlockCount(5000)
+        self.terminal.setMinimumHeight(160)
+        self.clear_terminal_button = QPushButton("出力クリア")
+        terminal_header = QHBoxLayout()
+        terminal_header.addStretch()
+        terminal_header.addWidget(self.clear_terminal_button)
+        terminal_layout = QVBoxLayout()
+        terminal_layout.addLayout(terminal_header)
+        terminal_layout.addWidget(self.terminal)
+        terminal_group = QGroupBox("実行チェック出力")
+        terminal_group.setLayout(terminal_layout)
+
         layout = QVBoxLayout(self)
         layout.addLayout(self.form)
         layout.addLayout(buttons)
-        layout.addStretch()
+        layout.addWidget(terminal_group, 1)
 
         self.entry_type.currentIndexChanged.connect(self._update_type_fields)
         self.new_button.clicked.connect(self.new_form)
@@ -101,6 +129,14 @@ class SettingsTab(QWidget):
         self.save_button.clicked.connect(self.save)
         self.delete_button.clicked.connect(self.delete)
         self.clear_button.clicked.connect(self.reset_values)
+        self.check_button.clicked.connect(self.run_check)
+        self.stop_check_button.clicked.connect(self.stop_check)
+        self.clear_terminal_button.clicked.connect(self.terminal.clear)
+        self.check_runner.standard_output.connect(self._append_stdout)
+        self.check_runner.standard_error.connect(self._append_stderr)
+        self.check_runner.running_changed.connect(self._update_check_buttons)
+        self.check_runner.finished.connect(self._check_finished)
+        self.check_runner.failed.connect(self._check_failed)
         self.new_form(confirm=False)
 
     @staticmethod
@@ -137,6 +173,67 @@ class SettingsTab(QWidget):
         for row in self._command_rows:
             self.form.setRowVisible(row, is_command)
         self.form.setRowVisible(self.url, not is_command)
+        self._update_check_buttons(self.check_runner.is_running)
+
+    def run_check(self) -> None:
+        tool = self._form_tool()
+        if not tool.name.strip():
+            tool.name = "実行チェック"
+        try:
+            self.service.validate(tool)
+            command = self.check_runner.start(tool)
+            self.terminal.clear()
+            self._append_status(f"> {subprocess.list2cmdline(command)}\n\n")
+            self._update_check_buttons(True)
+        except ValidationError as error:
+            QMessageBox.warning(self, "入力エラー", "\n".join(error.errors))
+        except Exception as error:
+            QMessageBox.critical(
+                self, "実行チェック", f"実行チェックを開始できませんでした。\n{error}"
+            )
+
+    def stop_check(self) -> None:
+        if self.check_runner.is_running:
+            self._append_status("\n[停止を要求しました]\n")
+        self.check_runner.stop()
+
+    def shutdown_check(self) -> None:
+        self.check_runner.shutdown()
+
+    def _update_check_buttons(self, running: bool) -> None:
+        is_command = self.entry_type.currentData() == "command"
+        self.check_button.setEnabled(is_command and not running)
+        self.stop_check_button.setEnabled(running)
+
+    def _check_finished(self, exit_code: int) -> None:
+        self._append_status(
+            f"\n[実行チェック終了: 終了コード {exit_code}]\n"
+        )
+
+    def _check_failed(self, message: str) -> None:
+        self._append_terminal(
+            f"\n[プロセスを起動できませんでした: {message}]\n",
+            QColor("#b91c1c"),
+        )
+
+    def _append_stdout(self, text: str) -> None:
+        self._append_terminal(text)
+
+    def _append_stderr(self, text: str) -> None:
+        self._append_terminal(text, QColor("#b91c1c"))
+
+    def _append_status(self, text: str) -> None:
+        self._append_terminal(text, QColor("#475569"))
+
+    def _append_terminal(self, text: str, color: QColor | None = None) -> None:
+        cursor = self.terminal.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        text_format = QTextCharFormat()
+        if color is not None:
+            text_format.setForeground(color)
+        cursor.insertText(text, text_format)
+        self.terminal.setTextCursor(cursor)
+        self.terminal.ensureCursorVisible()
 
     def new_form(self, *, confirm: bool = True) -> bool:
         if confirm and not self.confirm_discard_changes("新規入力へ切り替えますか？"):

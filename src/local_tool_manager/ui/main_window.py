@@ -54,4 +54,5 @@ class MainWindow(QMainWindow):
         ):
             event.ignore()
             return
+        self.settings_tab.shutdown_check()
         super().closeEvent(event)

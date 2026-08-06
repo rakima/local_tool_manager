@@ -1,3 +1,5 @@
+import sys
+import time
 from unittest.mock import Mock, patch
 
 from PySide6.QtWidgets import QApplication, QInputDialog, QMessageBox
@@ -17,11 +19,13 @@ def test_entry_type_switches_visible_rows():
 
     assert tab.form.isRowVisible(tab._command_rows[1])
     assert not tab.form.isRowVisible(tab.url)
+    assert tab.check_button.isEnabled()
 
     tab.entry_type.setCurrentIndex(1)
 
     assert not tab.form.isRowVisible(tab._command_rows[1])
     assert tab.form.isRowVisible(tab.url)
+    assert not tab.check_button.isEnabled()
 
 
 def test_new_form_keeps_unsaved_input_when_discard_is_declined():
@@ -102,3 +106,29 @@ def test_copy_keeps_current_input_when_discard_is_declined(repository):
         tab.copy_button.click()
 
     assert tab.name.text() == "編集中"
+
+
+def test_run_check_displays_stdout_stderr_and_exit_code(
+    repository, qt_application
+):
+    tab = SettingsTab(ToolService(repository), Mock())
+    tab.name.setText("実行チェック")
+    tab.command.setText(sys.executable)
+    tab.arguments.setText(
+        '-c "import sys; print(\'output\'); print(\'error\', file=sys.stderr)"'
+    )
+
+    tab.check_button.click()
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline and tab.check_runner.is_running:
+        qt_application.processEvents()
+        time.sleep(0.01)
+    qt_application.processEvents()
+
+    output = tab.terminal.toPlainText()
+    assert "output" in output
+    assert "error" in output
+    assert "終了コード 0" in output
+    assert tab.check_button.isEnabled()
+    assert not tab.stop_check_button.isEnabled()
+    tab.shutdown_check()
