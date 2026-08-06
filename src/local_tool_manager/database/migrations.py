@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS tools (
     allow_multiple_instances INTEGER NOT NULL DEFAULT 0,
     show_console INTEGER NOT NULL DEFAULT 0,
     is_favorite INTEGER NOT NULL DEFAULT 0,
+    sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -43,5 +44,21 @@ ON execution_history(tool_id, started_at DESC);
 def initialize_database(database: Database) -> None:
     with database.connect() as connection:
         connection.executescript(SCHEMA)
+        columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(tools)")
+        }
+        if "sort_order" not in columns:
+            connection.execute(
+                "ALTER TABLE tools ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0"
+            )
+            rows = connection.execute(
+                "SELECT id FROM tools "
+                "ORDER BY is_favorite DESC, lower(name), id"
+            ).fetchall()
+            for sort_order, row in enumerate(rows):
+                connection.execute(
+                    "UPDATE tools SET sort_order=? WHERE id=?",
+                    (sort_order, row["id"]),
+                )
     logging.getLogger(__name__).info("DB初期化: %s", database.path)
 

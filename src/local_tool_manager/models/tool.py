@@ -17,6 +17,7 @@ class Tool:
     allow_multiple_instances: bool = False
     show_console: bool = False
     is_favorite: bool = False
+    sort_order: int = 0
     created_at: str = ""
     updated_at: str = ""
     last_run_at: str | None = None

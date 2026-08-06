@@ -20,13 +20,16 @@ class ToolRepository:
         now = _now()
         values = self._values(tool)
         with self.database.connect() as connection:
+            sort_order = connection.execute(
+                "SELECT coalesce(max(sort_order), -1) + 1 FROM tools"
+            ).fetchone()[0]
             cursor = connection.execute(
                 """INSERT INTO tools (
                     name, description, category, entry_type, working_directory,
                     command, arguments, url, allow_multiple_instances,
-                    show_console, is_favorite, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (*values, now, now),
+                    show_console, is_favorite, sort_order, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (*values, sort_order, now, now),
             )
         return self.get(cursor.lastrowid)
 
@@ -77,7 +80,7 @@ class ToolRepository:
                     IN ('stopped', 'completed'))
                    OR (? <> 'stopped' AND coalesce((SELECT status FROM execution_history
                     WHERE tool_id=t.id ORDER BY started_at DESC LIMIT 1), 'stopped') = ?))
-            ORDER BY t.is_favorite DESC, lower(t.name)
+            ORDER BY t.sort_order, t.id
         """
         with self.database.connect() as connection:
             rows = connection.execute(
@@ -94,6 +97,19 @@ class ToolRepository:
                 ),
             ).fetchall()
         return [self._to_tool(row) for row in rows]
+
+    def reorder(self, tool_ids: list[int]) -> None:
+        with self.database.connect() as connection:
+            existing_ids = {
+                row["id"] for row in connection.execute("SELECT id FROM tools")
+            }
+            if len(tool_ids) != len(existing_ids) or set(tool_ids) != existing_ids:
+                raise ValueError("並べ替え対象が登録済みツールと一致しません。")
+            for sort_order, tool_id in enumerate(tool_ids):
+                connection.execute(
+                    "UPDATE tools SET sort_order=? WHERE id=?",
+                    (sort_order, tool_id),
+                )
 
     def categories(self) -> list[str]:
         with self.database.connect() as connection:
