@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import locale
 
-from PySide6.QtCore import QObject, QProcess, QTimer, Signal
+from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, QTimer, Signal
 
 from local_tool_manager.models import Tool
 
@@ -30,6 +30,10 @@ class CheckProcessRunner(QObject):
         super().__init__(parent)
         self.process = QProcess(self)
         self.process.setProcessChannelMode(QProcess.ProcessChannelMode.SeparateChannels)
+        environment = QProcessEnvironment.systemEnvironment()
+        environment.insert("PYTHONUNBUFFERED", "1")
+        environment.insert("PYTHONIOENCODING", "utf-8")
+        self.process.setProcessEnvironment(environment)
         self.process.started.connect(lambda: self.running_changed.emit(True))
         self.process.readyReadStandardOutput.connect(self._read_stdout)
         self.process.readyReadStandardError.connect(self._read_stderr)

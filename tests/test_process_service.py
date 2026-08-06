@@ -1,8 +1,14 @@
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import pytest
+
 from local_tool_manager.models import ExecutionHistory, Tool
-from local_tool_manager.services.process_service import ProcessService, build_command
+from local_tool_manager.services.process_service import (
+    ProcessService,
+    build_command,
+    resolve_python_executable,
+)
 
 
 def test_builds_command_without_splitting_quoted_argument():
@@ -44,6 +50,32 @@ def test_relative_python_script_is_resolved_from_working_directory(tmp_path):
 
     assert Path(command[0]).name.lower().startswith("python")
     assert Path(command[1]) == script
+
+
+def test_frozen_app_uses_python_from_path(monkeypatch):
+    monkeypatch.setattr(
+        "local_tool_manager.services.process_service.sys.frozen", True, raising=False
+    )
+
+    with patch(
+        "local_tool_manager.services.process_service.shutil.which",
+        side_effect=lambda name: r"C:\Python314\python.exe"
+        if name == "python.exe"
+        else None,
+    ):
+        assert resolve_python_executable() == r"C:\Python314\python.exe"
+
+
+def test_frozen_app_reports_missing_python(monkeypatch):
+    monkeypatch.setattr(
+        "local_tool_manager.services.process_service.sys.frozen", True, raising=False
+    )
+
+    with (
+        patch("local_tool_manager.services.process_service.shutil.which", return_value=None),
+        pytest.raises(RuntimeError, match="Python実行環境が見つかりません"),
+    ):
+        resolve_python_executable()
 
 
 def test_nonexistent_pid_is_not_running_and_history_is_closed(repository):

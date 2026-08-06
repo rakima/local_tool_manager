@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -24,8 +25,20 @@ def build_command(tool: Tool) -> list[str]:
     arguments = shlex.split(tool.arguments, posix=False) if tool.arguments.strip() else []
     arguments = [part.strip('"') for part in arguments]
     if Path(command).suffix.lower() == ".py":
-        return [sys.executable, command, *arguments]
+        return [resolve_python_executable(), command, *arguments]
     return [command, *arguments]
+
+
+def resolve_python_executable() -> str:
+    if not getattr(sys, "frozen", False):
+        return sys.executable
+    for name in ("python.exe", "python", "py.exe", "py"):
+        executable = shutil.which(name)
+        if executable:
+            return executable
+    raise RuntimeError(
+        "Python実行環境が見つかりません。実行コマンドにpython.exeを指定してください。"
+    )
 
 
 def resolve_command(tool: Tool) -> str:
