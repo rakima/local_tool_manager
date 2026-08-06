@@ -17,11 +17,13 @@ def test_entry_type_switches_visible_rows():
 
     assert tab.form.isRowVisible(tab._command_rows[1])
     assert not tab.form.isRowVisible(tab.url)
+    assert tab.check_button.isEnabled()
 
     tab.entry_type.setCurrentIndex(1)
 
     assert not tab.form.isRowVisible(tab._command_rows[1])
     assert tab.form.isRowVisible(tab.url)
+    assert not tab.check_button.isEnabled()
 
 
 def test_new_form_keeps_unsaved_input_when_discard_is_declined():

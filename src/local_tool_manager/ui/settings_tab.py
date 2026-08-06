@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from local_tool_manager.models import Tool
-from local_tool_manager.services import ProcessService
+from local_tool_manager.services import CheckProcessRunner, ProcessService
 from local_tool_manager.services.tool_service import ToolService, ValidationError
 
 
@@ -34,6 +34,7 @@ class SettingsTab(QWidget):
         self.current_id: int | None = None
         self._original: Tool | None = None
         self._baseline: tuple | None = None
+        self.check_runner = CheckProcessRunner(self)
 
         self.name = QLineEdit()
         self.description = QTextEdit()
@@ -79,6 +80,9 @@ class SettingsTab(QWidget):
         self.save_button = QPushButton("保存")
         self.delete_button = QPushButton("削除")
         self.clear_button = QPushButton("入力クリア")
+        self.check_button = QPushButton("実行チェック")
+        self.stop_check_button = QPushButton("チェック停止")
+        self.stop_check_button.setEnabled(False)
         buttons = QHBoxLayout()
         for button in (
             self.new_button,
@@ -86,6 +90,8 @@ class SettingsTab(QWidget):
             self.save_button,
             self.delete_button,
             self.clear_button,
+            self.check_button,
+            self.stop_check_button,
         ):
             buttons.addWidget(button)
         buttons.addStretch()
@@ -101,6 +107,11 @@ class SettingsTab(QWidget):
         self.save_button.clicked.connect(self.save)
         self.delete_button.clicked.connect(self.delete)
         self.clear_button.clicked.connect(self.reset_values)
+        self.check_button.clicked.connect(self.run_check)
+        self.stop_check_button.clicked.connect(self.stop_check)
+        self.check_runner.running_changed.connect(self._update_check_buttons)
+        self.check_runner.finished.connect(self._check_finished)
+        self.check_runner.failed.connect(self._check_failed)
         self.new_form(confirm=False)
 
     @staticmethod
@@ -137,6 +148,43 @@ class SettingsTab(QWidget):
         for row in self._command_rows:
             self.form.setRowVisible(row, is_command)
         self.form.setRowVisible(self.url, not is_command)
+        self._update_check_buttons(self.check_runner.is_running)
+
+    def run_check(self) -> None:
+        tool = self._form_tool()
+        if not tool.name.strip():
+            tool.name = "実行チェック"
+        try:
+            self.service.validate(tool)
+            self.check_runner.start(tool)
+            self._update_check_buttons(True)
+        except ValidationError as error:
+            QMessageBox.warning(self, "入力エラー", "\n".join(error.errors))
+        except Exception as error:
+            QMessageBox.critical(
+                self, "実行チェック", f"実行チェックを開始できませんでした。\n{error}"
+            )
+
+    def stop_check(self) -> None:
+        self.check_runner.stop()
+
+    def shutdown_check(self) -> None:
+        self.check_runner.shutdown()
+
+    def _update_check_buttons(self, running: bool) -> None:
+        is_command = self.entry_type.currentData() == "command"
+        self.check_button.setEnabled(is_command and not running)
+        self.stop_check_button.setEnabled(running)
+
+    def _check_finished(self, exit_code: int) -> None:
+        QMessageBox.information(
+            self, "実行チェック", f"実行チェックが終了しました。\n終了コード: {exit_code}"
+        )
+
+    def _check_failed(self, message: str) -> None:
+        QMessageBox.critical(
+            self, "実行チェック", f"プロセスを起動できませんでした。\n{message}"
+        )
 
     def new_form(self, *, confirm: bool = True) -> bool:
         if confirm and not self.confirm_discard_changes("新規入力へ切り替えますか？"):
