@@ -52,6 +52,27 @@ def format_last_run_at(value: str | None) -> str:
         return value
 
 
+class ToolTableWidget(QTableWidget):
+    row_moved = Signal(int, int)
+
+    def dropEvent(self, event) -> None:
+        source_row = self.currentRow()
+        target_row = self.indexAt(event.position().toPoint()).row()
+        if target_row < 0:
+            target_row = self.rowCount() - 1
+        elif (
+            self.dropIndicatorPosition()
+            == QAbstractItemView.DropIndicatorPosition.BelowItem
+        ):
+            target_row += 1
+        if source_row < target_row:
+            target_row -= 1
+        target_row = max(0, min(target_row, self.rowCount() - 1))
+        if source_row >= 0 and source_row != target_row:
+            self.row_moved.emit(source_row, target_row)
+        event.acceptProposedAction()
+
+
 class ExecutionTab(QWidget):
     edit_requested = Signal(object, bool)
 
@@ -81,12 +102,16 @@ class ExecutionTab(QWidget):
         filters.addWidget(self.edit_button)
         filters.addWidget(self.reload_button)
 
-        self.table = QTableWidget(0, 7)
+        self.table = ToolTableWidget(0, 7)
         self.table.setHorizontalHeaderLabels(
             ["お気に入り", "ツール名", "種類", "カテゴリ", "状態", "最終実行日時", "説明"]
         )
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
+        self.table.setDragDropOverwriteMode(False)
+        self.table.setDropIndicatorShown(True)
         self.table.setStyleSheet("QTableWidget { outline: none; }")
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.verticalHeader().setVisible(False)
@@ -105,6 +130,7 @@ class ExecutionTab(QWidget):
         self.edit_button.clicked.connect(lambda: self.edit_selected(False))
         self.reload_button.clicked.connect(self.reload)
         self.table.itemSelectionChanged.connect(self._update_selection_actions)
+        self.table.row_moved.connect(self._move_tool)
         self.table.doubleClicked.connect(lambda: self.run_selected())
         self.table.customContextMenuRequested.connect(self._show_menu)
         self.timer = QTimer(self)
@@ -114,6 +140,8 @@ class ExecutionTab(QWidget):
         self.reload()
 
     def reload(self) -> None:
+        selected = self.selected_tool()
+        selected_id = selected.id if selected else None
         category = self.category.currentData() or ""
         categories = self.repository.categories()
         current = category
@@ -145,7 +173,36 @@ class ExecutionTab(QWidget):
             ]
             for column, value in enumerate(values):
                 self.table.setItem(row, column, QTableWidgetItem(value))
+            if tool.id == selected_id:
+                self.table.selectRow(row)
+        ordering_enabled = not (
+            self.search.text() or current or (self.status.currentData() or "")
+        )
+        self.table.setDragEnabled(ordering_enabled)
+        self.table.setAcceptDrops(ordering_enabled)
+        self.table.setToolTip(
+            "ドラッグして並べ替え"
+            if ordering_enabled
+            else "検索・絞り込み中は並べ替えできません"
+        )
         self._update_selection_actions()
+
+    def _move_tool(self, source_row: int, target_row: int) -> None:
+        tool_ids = [tool.id for tool in self.tools if tool.id is not None]
+        if len(tool_ids) != len(self.tools):
+            return
+        tool_id = tool_ids.pop(source_row)
+        tool_ids.insert(target_row, tool_id)
+        try:
+            self.repository.reorder(tool_ids)
+        except Exception as error:
+            logging.getLogger(__name__).exception("ツールの並べ替えに失敗")
+            QMessageBox.critical(
+                self, "並べ替えエラー", f"並べ替えできませんでした。\n{error}"
+            )
+            return
+        self.reload()
+        self.table.selectRow(target_row)
 
     def _update_selection_actions(self) -> None:
         self.edit_button.setEnabled(self.selected_tool() is not None)

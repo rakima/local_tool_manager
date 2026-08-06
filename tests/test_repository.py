@@ -35,3 +35,19 @@ def test_search_name_description_and_category_case_insensitive(repository):
     assert len(repository.list(search="local")) == 1
     assert len(repository.list(search="development")) == 1
 
+
+def test_reorders_tools_and_appends_new_tool(repository):
+    first = repository.create(command_tool("First"))
+    second = repository.create(command_tool("Second"))
+    third = repository.create(command_tool("Third"))
+
+    repository.reorder([third.id, first.id, second.id])
+    added = repository.create(command_tool("Added"))
+
+    assert [tool.id for tool in repository.list()] == [
+        third.id,
+        first.id,
+        second.id,
+        added.id,
+    ]
+

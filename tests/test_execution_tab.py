@@ -40,3 +40,31 @@ def test_edit_button_opens_selected_tool(repository):
 
     assert tab.edit_button.isEnabled()
     assert requested == [(tool, False)]
+
+
+def test_moves_tool_and_persists_order(repository):
+    tools = [
+        repository.create(Tool(name=name, entry_type="command", command="python"))
+        for name in ("First", "Second", "Third")
+    ]
+    tab = ExecutionTab(repository, Mock())
+
+    tab._move_tool(0, 2)
+
+    assert [tool.id for tool in repository.list()] == [
+        tools[1].id,
+        tools[2].id,
+        tools[0].id,
+    ]
+    assert tab.table.currentRow() == 2
+
+
+def test_disables_reordering_while_filtering(repository):
+    repository.create(Tool(name="Sample", entry_type="command", command="python"))
+    tab = ExecutionTab(repository, Mock())
+
+    assert tab.table.dragEnabled()
+
+    tab.search.setText("sample")
+
+    assert not tab.table.dragEnabled()
