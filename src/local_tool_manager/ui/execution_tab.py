@@ -70,12 +70,15 @@ class ExecutionTab(QWidget):
         self.status.addItem("停止中", "stopped")
         self.status.addItem("実行中", "running")
         self.status.addItem("異常終了", "failed")
+        self.edit_button = QPushButton("編集")
+        self.edit_button.setEnabled(False)
         self.reload_button = QPushButton("再読み込み")
 
         filters = QHBoxLayout()
         filters.addWidget(self.search, 2)
         filters.addWidget(self.category)
         filters.addWidget(self.status)
+        filters.addWidget(self.edit_button)
         filters.addWidget(self.reload_button)
 
         self.table = QTableWidget(0, 7)
@@ -99,7 +102,9 @@ class ExecutionTab(QWidget):
         self.search.textChanged.connect(self.reload)
         self.category.currentIndexChanged.connect(self.reload)
         self.status.currentIndexChanged.connect(self.reload)
+        self.edit_button.clicked.connect(lambda: self.edit_selected(False))
         self.reload_button.clicked.connect(self.reload)
+        self.table.itemSelectionChanged.connect(self._update_selection_actions)
         self.table.doubleClicked.connect(lambda: self.run_selected())
         self.table.customContextMenuRequested.connect(self._show_menu)
         self.timer = QTimer(self)
@@ -140,6 +145,10 @@ class ExecutionTab(QWidget):
             ]
             for column, value in enumerate(values):
                 self.table.setItem(row, column, QTableWidgetItem(value))
+        self._update_selection_actions()
+
+    def _update_selection_actions(self) -> None:
+        self.edit_button.setEnabled(self.selected_tool() is not None)
 
     def selected_tool(self) -> Tool | None:
         row = self.table.currentRow()
