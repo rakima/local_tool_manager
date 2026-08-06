@@ -41,6 +41,21 @@ STATUS_LABELS = {
     "stopped": "停止中",
 }
 
+TABLE_STYLE = """
+QTableWidget {
+    outline: 0;
+}
+QTableWidget::item:selected,
+QTableWidget::item:selected:active,
+QTableWidget::item:selected:!active {
+    background-color: #cfe8ff;
+    color: #0f172a;
+}
+QTableWidget::item:focus {
+    border: 0;
+}
+"""
+
 
 def format_last_run_at(value: str | None) -> str:
     if not value:
@@ -112,7 +127,7 @@ class ExecutionTab(QWidget):
         self.table.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         self.table.setDragDropOverwriteMode(False)
         self.table.setDropIndicatorShown(True)
-        self.table.setStyleSheet("QTableWidget { outline: none; }")
+        self.table.setStyleSheet(TABLE_STYLE)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.verticalHeader().setVisible(False)
         header = self.table.horizontalHeader()
