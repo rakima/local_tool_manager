@@ -2,6 +2,8 @@
 
 自作のPythonスクリプト、exe、bat/cmd、PATH上の任意コマンド、ブラウザURLを登録し、一覧から起動・停止するWindows向けGUIアプリです。ツールごとに実行ディレクトリ、引数、カテゴリ、説明、多重起動可否などを管理できます。
 
+![Local Tool Managerの実行画面](image/01_demo.png)
+
 ## 必要環境
 
 - Windows 10/11
