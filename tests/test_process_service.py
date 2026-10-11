@@ -26,6 +26,31 @@ def test_builds_command_without_splitting_quoted_argument():
     ]
 
 
+def test_builds_powershell_command_block_as_single_argument():
+    tool = Tool(
+        name="powershell",
+        entry_type="command",
+        command="powershell.exe",
+        arguments=(
+            '-NoProfile -ExecutionPolicy RemoteSigned -Command '
+            '"& { & \'D:\\tools\\sample\\.venv\\Scripts\\Activate.ps1\'; '
+            'python -m app.main --gui }"'
+        ),
+    )
+
+    assert build_command(tool) == [
+        "powershell.exe",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "RemoteSigned",
+        "-Command",
+        (
+            "& { & 'D:\\tools\\sample\\.venv\\Scripts\\Activate.ps1'; "
+            "python -m app.main --gui }"
+        ),
+    ]
+
+
 def test_python_script_uses_current_interpreter():
     tool = Tool(
         name="python", entry_type="command", command=r"C:\tools\main.py", arguments="--x 1"
