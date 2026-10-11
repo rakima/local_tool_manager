@@ -70,6 +70,22 @@ dist\LocalToolManager.exe
 実行コマンド: scripts\main.py
 ```
 
+仮想環境を有効化してから複数のPowerShell処理を続けて実行する場合は、
+`powershell.exe`を登録し、処理全体を同じ`-Command`ブロックへ記述します。
+
+```text
+実行ディレクトリ: D:\tools\sample
+実行コマンド: powershell.exe
+引数: -NoProfile -ExecutionPolicy RemoteSigned -Command "& { & 'D:\tools\sample\.venv\Scripts\Activate.ps1'; python -m app.main --gui }"
+```
+
+venvの有効化は、そのPowerShellプロセスの中だけで有効です。実際に起動する
+コマンドも同じブロックへ記述してください。処理が複雑な場合は`.ps1`ファイルへ
+まとめ、`-File`オプションで実行する方法を推奨します。
+
+Pythonツールを起動するだけなら、仮想環境の`python.exe`を実行コマンドへ直接
+指定する方が簡単で、PowerShellの実行ポリシー変更も不要です。
+
 ### exe
 
 - 種類: `コマンド`
